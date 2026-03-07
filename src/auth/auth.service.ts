@@ -1,70 +1,147 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
-import { hash } from 'argon2';
+import { LoginDto } from './dto/login.dto';
+import { hash, verify } from 'argon2';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-
+import { Response } from 'express';
 
 @Injectable()
 export class AuthService {
+  private readonly JWT_ACCESS_TOKEN_TTL: string;
+  private readonly JWT_REFRESH_TOKEN_TTL: string;
+  private readonly COOKIE_DOMAIN: string;
 
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
+  ) {
+    this.JWT_ACCESS_TOKEN_TTL = this.configService.getOrThrow<string>(
+      'JWT_ACCESS_TOKEN_TTL',
+    );
+    this.JWT_REFRESH_TOKEN_TTL = this.configService.getOrThrow<string>(
+      'JWT_REFRESH_TOKEN_TTL',
+    );
+    this.COOKIE_DOMAIN = this.configService.getOrThrow<string>('COOKIE_DOMAIN');
+  }
 
- private readonly JWT_SECRET: string;
- private readonly JWT_ACCESS_TOKEN_TTL: string;
- private readonly JWT_REFRESH_TOKEN_TTL: string;
+  async register(dto: RegisterDto, res: Response) {
+    const { email, name, password } = dto;
 
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingUser) {
+      throw new BadRequestException(
+        'Пользователь с таким email уже существует',
+      );
+    }
 
- constructor(
-   private readonly prisma: PrismaService,
-   private readonly configService: ConfigService,
-   private readonly jwtService: JwtService,
- ) {
-   this.JWT_SECRET = this.configService.getOrThrow<string>('JWT_SECRET');
-   this.JWT_ACCESS_TOKEN_TTL = this.configService.getOrThrow<string>(
-     'JWT_ACCESS_TOKEN_TTL',
-   );
-   this.JWT_REFRESH_TOKEN_TTL = this.configService.getOrThrow<string>(
-     'JWT_REFRESH_TOKEN_TTL',
-   );
- }
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        name,
+        password: await hash(password),
+      },
+    });
 
+    const { accessToken, refreshToken } = this.generateTokens(
+      String(user.id),
+    );
+    this.setRefreshTokenCookie(res, refreshToken);
 
- async register(dto: RegisterDto) {
-   const { email, name, password } = dto;
+    return { accessToken };
+  }
 
+  async login(dto: LoginDto, res: Response) {
+    const { email, password } = dto;
 
-   const existingUser = await this.prisma.user.findUnique({
-     where: { email },
-   });
-   if (existingUser) {
-     throw new Error('Пользователь с таким email уже существует');
-   }
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Неверный email или пароль');
+    }
 
+    const isPasswordValid = await verify(user.password, password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Неверный email или пароль');
+    }
 
-   const user = await this.prisma.user.create({
-     data: {
-       email,
-       name,
-       password: await hash(password),
-     },
-   });
-   return this.generateTokens(String(user.id));
- }
+    const { accessToken, refreshToken } = this.generateTokens(
+      String(user.id),
+    );
+    this.setRefreshTokenCookie(res, refreshToken);
 
+    return { accessToken };
+  }
 
- private generateTokens(id: string) {
-   const payload = { id };
+  async refresh(refreshTokenFromCookie: string, res: Response) {
+    if (!refreshTokenFromCookie) {
+      throw new UnauthorizedException('Refresh token не найден');
+    }
 
+    let payload: { id: string };
+    try {
+      payload = this.jwtService.verify<{ id: string }>(refreshTokenFromCookie);
+    } catch {
+      throw new UnauthorizedException('Невалидный refresh token');
+    }
 
-   const accessToken = this.jwtService.sign(payload, {
-     expiresIn: this.JWT_ACCESS_TOKEN_TTL as unknown as any,
-   });
-   const refreshToken = this.jwtService.sign(payload, {
-     expiresIn: this.JWT_REFRESH_TOKEN_TTL as unknown as any,
-   });
+    const user = await this.prisma.user.findUnique({
+      where: { id: Number(payload.id) },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Пользователь не найден');
+    }
 
+    const { accessToken, refreshToken } = this.generateTokens(
+      String(user.id),
+    );
+    this.setRefreshTokenCookie(res, refreshToken);
 
-   return { accessToken, refreshToken };
- }
+    return { accessToken };
+  }
+
+  logout(res: Response) {
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      domain: this.COOKIE_DOMAIN,
+      secure: true,
+      sameSite: 'none',
+    });
+    return { message: 'Вы успешно вышли из системы' };
+  }
+
+  private generateTokens(id: string) {
+    const payload = { id };
+
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.JWT_ACCESS_TOKEN_TTL as any,
+    });
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: this.JWT_REFRESH_TOKEN_TTL as any,
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  private setRefreshTokenCookie(res: Response, token: string) {
+    const expires = new Date();
+    expires.setDate(expires.getDate() + 7);
+
+    res.cookie('refreshToken', token, {
+      httpOnly: true,
+      expires,
+      domain: this.COOKIE_DOMAIN,
+      secure: true,
+      sameSite: 'none',
+    });
+  }
 }
