@@ -12,15 +12,15 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { Authorization } from './decorators/authorization.decorator';
 import { Authorized } from './decorators/authorized.decorator';
-
+import { Public } from './decorators/public.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Регистрация нового пользователя' })
@@ -33,6 +33,7 @@ export class AuthController {
     return this.authService.register(dto, res);
   }
 
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Авторизация по email и паролю' })
@@ -45,6 +46,7 @@ export class AuthController {
     return this.authService.login(dto, res);
   }
 
+  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Обновление access token через refresh token из cookie' })
@@ -66,7 +68,6 @@ export class AuthController {
     return this.authService.logout(res);
   }
 
-  @Authorization()
   @Get('me')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()

@@ -1,14 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateTaskDto, TaskStatus } from './dto/create-task.dto';
+import { Role } from 'src/auth/enums/role.enum';
 
 @Injectable()
 export class TasksService {
   constructor(private prisma: PrismaService) {}
 
-  create(createTaskDto: CreateTaskDto) {
+  create(createTaskDto: CreateTaskDto, userId: number) {
     return this.prisma.task.create({
-      data: createTaskDto,
+      data: { ...createTaskDto, userId },
       include: { board: true, user: true },
     });
   }
@@ -29,8 +30,25 @@ export class TasksService {
     return task;
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
+  async update(id: number, updateTaskDto: CreateTaskDto, userId: number, userRole: string) {
+    const task = await this.findOne(id);
+    this.checkOwnership(task.userId, userId, userRole);
+    return this.prisma.task.update({
+      where: { id },
+      data: updateTaskDto,
+      include: { board: true, user: true },
+    });
+  }
+
+  async remove(id: number, userId: number, userRole: string) {
+    const task = await this.findOne(id);
+    this.checkOwnership(task.userId, userId, userRole);
     return this.prisma.task.delete({ where: { id } });
+  }
+
+  private checkOwnership(taskUserId: number, userId: number, userRole: string) {
+    if (taskUserId !== userId && userRole !== Role.ADMIN) {
+      throw new ForbiddenException('Вы не являетесь владельцем этой задачи');
+    }
   }
 }

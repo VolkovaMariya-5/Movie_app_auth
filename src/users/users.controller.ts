@@ -1,8 +1,10 @@
 import { Controller, Get, Post, Body, Param, Delete, ParseIntPipe } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { Authorized } from 'src/auth/decorators/authorized.decorator';
 
+@ApiBearerAuth()
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
@@ -11,6 +13,11 @@ export class UsersController {
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
+  }
+
+  @Get('me')
+  me(@Authorized('id') id: number) {
+    return this.usersService.findMe(id);
   }
 
   @Get()

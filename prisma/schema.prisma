@@ -8,6 +8,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 enum TaskStatus {
   todo
   in_progress
@@ -20,8 +25,7 @@ model User {
   email String  @unique
   tasks Task[]
   password String
-
-  
+  role     Role   @default(USER)
 }
 
 model Board {

@@ -23,6 +23,21 @@ export class UsersService {
     return user;
   }
 
+  async findMe(id: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        tasks: true,
+      },
+    });
+    if (!user) throw new NotFoundException('Пользователь не найден');
+    return user;
+  }
+
   async remove(id: number) {
     await this.findOne(id);
     return this.prisma.user.delete({ where: { id } });

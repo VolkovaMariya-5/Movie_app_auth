@@ -23,6 +23,11 @@ export class BoardsService {
     return board;
   }
 
+  async update(id: number, updateBoardDto: CreateBoardDto) {
+    await this.findOne(id);
+    return this.prisma.board.update({ where: { id }, data: updateBoardDto });
+  }
+
   async remove(id: number) {
     await this.findOne(id);
     return this.prisma.board.delete({ where: { id } });

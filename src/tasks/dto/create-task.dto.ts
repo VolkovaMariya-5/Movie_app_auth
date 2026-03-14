@@ -27,9 +27,4 @@ export class CreateTaskDto {
   @IsInt()
   @IsNotEmpty()
   boardId: number;
-
-  @ApiProperty({ example: 1, description: 'ID пользователя' })
-  @IsInt()
-  @IsNotEmpty()
-  userId: number;
 }
