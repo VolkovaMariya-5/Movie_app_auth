@@ -3,6 +3,8 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { Authorized } from 'src/auth/decorators/authorized.decorator';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { Role } from 'src/auth/enums/role.enum';
 
 @ApiBearerAuth()
 @ApiTags('Users')
@@ -15,12 +17,13 @@ export class UsersController {
     return this.usersService.create(createUserDto);
   }
 
-  @Get('me')
-  me(@Authorized('id') id: number) {
+  @Get('profile')
+  profile(@Authorized('id') id: number) {
     return this.usersService.findMe(id);
   }
 
   @Get()
+  @Roles(Role.ADMIN)
   findAll() {
     return this.usersService.findAll();
   }

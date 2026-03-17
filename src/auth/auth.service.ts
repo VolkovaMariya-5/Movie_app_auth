@@ -1,8 +1,8 @@
 import {
   Injectable,
-  BadRequestException,
-  UnauthorizedException,
-  NotFoundException
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
@@ -39,7 +39,7 @@ export class AuthService {
       where: { email },
     });
     if (existingUser) {
-      throw new BadRequestException(
+      throw new ConflictException(
         'Пользователь с таким email уже существует',
       );
     }
@@ -67,12 +67,12 @@ export class AuthService {
       where: { email },
     });
     if (!user) {
-      throw new UnauthorizedException('Неверный email или пароль');
+      throw new NotFoundException('Неверный email или пароль');
     }
 
     const isPasswordValid = await verify(user.password, password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Неверный email или пароль');
+      throw new NotFoundException('Неверный email или пароль');
     }
 
     const { accessToken, refreshToken } = this.generateTokens(

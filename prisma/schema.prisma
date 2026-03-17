@@ -19,11 +19,23 @@ enum TaskStatus {
   done
 }
 
+enum Genre {
+  ACTION
+  COMEDY
+  DRAMA
+  HORROR
+  SCI_FI
+  THRILLER
+  ROMANCE
+  DOCUMENTARY
+}
+
 model User {
   id    Int     @id @default(autoincrement())
   name  String
   email String  @unique
-  tasks Task[]
+  tasks    Task[]
+  reviews  Review[]
   password String
   role     Role   @default(USER)
 }
@@ -45,4 +57,25 @@ model Task {
   board       Board      @relation(fields: [boardId], references: [id])
   userId      Int
   user        User       @relation(fields: [userId], references: [id])
+}
+
+model Movie {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  year        Int
+  genre       Genre
+  createdAt   DateTime @default(now())
+  reviews     Review[]
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  movieId   Int
+  movie     Movie    @relation(fields: [movieId], references: [id])
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
 }

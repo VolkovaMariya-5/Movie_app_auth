@@ -1,0 +1,15 @@
+async findOne(id: string) {
+ const movie = await this.prisma.movie.findUnique({ where: { id } });
+ if (!movie) throw new NotFoundException(`Movie ${id} not found`);
+ return movie;
+}
+
+
+{
+ "extends": "./tsconfig.json",
+ "compilerOptions": {
+   "module": "commonjs",
+   "moduleResolution": "node",
+   "resolvePackageJsonExports": false
+ }
+}

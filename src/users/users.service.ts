@@ -32,6 +32,9 @@ export class UsersService {
         email: true,
         role: true,
         tasks: true,
+        reviews: {
+          include: { movie: true },
+        },
       },
     });
     if (!user) throw new NotFoundException('Пользователь не найден');
